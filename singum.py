@@ -77,10 +77,10 @@ voronoi_gdf = gpd.GeoDataFrame({
     "geometry": poly_geoms
 }, crs=gdf.crs)  # make sure CRS matches original
 voronoi_gdf = voronoi_gdf.dissolve(by="NodeID", as_index=False)
-manhattan_gdf = gpd.read_file("manhattan_boundary.geojson")
+manhattan_gdf = gpd.read_file("data/manhattan_boundary.geojson")
 
 filtered_voronoi = voronoi_gdf[voronoi_gdf.geometry.intersects(manhattan_gdf.iloc[0].geometry)]
-filtered_voronoi.to_file("singum_voronoi.geojson", driver="GeoJSON")
+filtered_voronoi.to_file("data/singum_voronoi.geojson", driver="GeoJSON")
 
 print("Before clipping:", len(poly_geoms))
 print("After clipping:", len(filtered_voronoi))

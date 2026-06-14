@@ -1,0 +1,301 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+
+\definecolor{required}{RGB}{34,139,34}
+\definecolor{optional}{RGB}{218,165,32}
+\definecolor{unused}{RGB}{178,34,34}
+
+\lstset{
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    frame=single,
+    language=Python
+}
+
+\title{Function Reference for \texttt{case2.py}\\
+\large Singum Traffic Flow Research}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+%==============================================================================
+\section{Paper Equations and Code Mapping}
+%==============================================================================
+
+This code implements the singum model for traffic flow prediction as described in the PNAS paper. The key equations and their code locations are:
+
+\subsection{Governing PDE (Paper Eq. 11)}
+
+The anisotropic diffusion equation:
+\begin{equation}
+    k_{ij} V_{,ij} = 0 \quad \Leftrightarrow \quad \nabla \cdot (K \nabla V) = 0
+\end{equation}
+
+\textbf{Implementation:} Solved using P1 Finite Element Method (FEM) with Delaunay triangulation.
+\begin{itemize}[noitemsep]
+    \item \texttt{solve\_fem\_anisotropic()} -- Main FEM solver (lines 273--309)
+    \item \texttt{\_element\_stiffness\_anisotropic()} -- Element stiffness matrix (lines 186--228)
+    \item \texttt{\_assemble\_fem\_system()} -- Global matrix assembly (lines 231--270)
+    \item \texttt{\_create\_fem\_mesh()} -- Delaunay mesh generation (lines 148--183)
+\end{itemize}
+
+The FEM weak form:
+\begin{equation}
+    \int_\Omega (K \nabla V) \cdot \nabla v \, d\Omega = 0
+\end{equation}
+
+\subsection{Conductivity Tensor (Paper Eqs. 20--21)}
+
+For non-central-symmetric networks, the effective conductivity is:
+\begin{equation}
+    k_{ij} = k^1_{ij} + k^2_{ij}
+\end{equation}
+
+where:
+\begin{align}
+    k^1_{ij} &= \frac{\sum_I K^I A \, x^I_i x^I_j}{V_s \, l_p^0} \quad \text{(Cauchy-Born rule)} \\
+    k^2_{ij} &= -\frac{\left(\sum_I K^I A \, n^I_i\right) \left(\sum_I K^I A \, n^I_j\right)}{\sum_I K^I A / l_p^0 \cdot V_s} \quad \text{(Non-symmetric correction)}
+\end{align}
+
+\textbf{Implementation:} \texttt{build\_K\_from\_voronoi()} (lines 1199--1281)
+\begin{itemize}[noitemsep]
+    \item Lines 1230--1244: Compute $k^1_{ij}$ (CB rule term)
+    \item Lines 1246--1271: Compute $k^2_{ij}$ (correction for non-symmetric networks)
+    \item Lines 1277--1279: Combine and divide by singum area $V_s$
+\end{itemize}
+
+\subsection{Constitutive Relation (Paper Eq. 2)}
+
+\begin{equation}
+    q_i = -k_{ij} V_{,j}
+\end{equation}
+
+This is implicitly used in the FEM formulation and greedy routing algorithm.
+
+%==============================================================================
+\section{Quick Reference: Functions Needed for Each Graph}
+%==============================================================================
+
+\subsection{Figure 5c: NBA Game Dispersal (MSG $\to$ Destinations)}
+
+To generate Figure 5c, call \texttt{run\_fig5c()} which uses:
+
+\begin{enumerate}[noitemsep]
+    \item \texttt{case\_5c\_nba\_game()} -- Main figure generator
+    \item \texttt{load\_graph()} -- Load road network graph
+    \item \texttt{greedy\_path\_on\_nodes()} -- Singum routing algorithm
+    \item \texttt{path\_time()} -- Calculate travel times
+    \item \texttt{lonlat\_to\_2263()} -- Convert coordinates
+    \item \texttt{nearest\_node()} -- Find closest network node
+\end{enumerate}
+
+\textbf{Prerequisite functions} (run once to prepare data):
+\begin{itemize}[noitemsep]
+    \item \texttt{align\_and\_clip()} -- Preprocess road data
+    \item \texttt{build\_graph\_from\_roads()} -- Build graph
+    \item \texttt{solve\_node\_potential()} -- Compute potential field
+\end{itemize}
+
+\subsection{Figure 5c Reverse: Arrival at MSG}
+
+Call \texttt{run\_fig5c\_arrival()} which additionally uses:
+\begin{itemize}[noitemsep]
+    \item \texttt{case\_5c\_nba\_arrival()} -- Reverse scenario generator
+    \item \texttt{build\_K\_from\_voronoi()} -- Compute conductivity tensors (Eqs. 20--21)
+    \item \texttt{solve\_fem\_anisotropic()} -- FEM solver for PDE (Eq. 11)
+    \item \texttt{\_manhattan\_mask\_and\_grid()} -- Create computation grid
+    \item \texttt{\_interp\_K\_no\_nans()} -- Interpolate K tensors
+\end{itemize}
+
+\subsection{Figure 5d: GW Bridge to Columbia Commute}
+
+Call \texttt{run\_fig5d()} which uses:
+\begin{itemize}[noitemsep]
+    \item \texttt{case\_5d\_gw\_commute()} -- Commute scenario generator
+    \item \texttt{dijkstra\_path()} -- Shortest path computation
+    \item \texttt{compute\_shortest\_path\_potential()} -- Distance-based potential
+    \item \texttt{greedy\_path\_on\_nodes()} -- Singum routing
+\end{itemize}
+
+\subsection{Basic Pipeline (main())}
+
+The \texttt{main()} function runs the full pipeline:
+\begin{enumerate}[noitemsep]
+    \item \texttt{align\_and\_clip()}
+    \item \texttt{build\_graph\_from\_roads()}
+    \item \texttt{solve\_node\_potential()}
+    \item \texttt{compute\_routes\_and\_plot()}
+    \item \texttt{build\_K\_from\_voronoi()}
+    \item \texttt{solve\_continuum\_and\_plot()}
+\end{enumerate}
+
+%==============================================================================
+\section{Function Classification}
+%==============================================================================
+
+\begin{longtable}{p{5.5cm}p{2cm}p{6cm}}
+\toprule
+\textbf{Function} & \textbf{Status} & \textbf{Purpose} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Function} & \textbf{Status} & \textbf{Purpose} \\
+\midrule
+\endhead
+
+\multicolumn{3}{l}{\textbf{Entry Points}} \\
+\midrule
+\texttt{main()} & \textcolor{required}{Required} & Run full pipeline \\
+\texttt{run\_fig5c()} & \textcolor{required}{Required} & Generate Fig 5c \\
+\texttt{run\_fig5c\_arrival()} & \textcolor{required}{Required} & Generate Fig 5c reverse \\
+\texttt{run\_fig5d()} & \textcolor{required}{Required} & Generate Fig 5d \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{FEM Solver (Paper Eq. 11)}} \\
+\midrule
+\texttt{\_create\_fem\_mesh()} & \textcolor{required}{Required} & Delaunay triangulation \\
+\texttt{\_element\_stiffness\_anisotropic()} & \textcolor{required}{Required} & P1 element stiffness \\
+\texttt{\_assemble\_fem\_system()} & \textcolor{required}{Required} & Global matrix assembly \\
+\texttt{solve\_fem\_anisotropic()} & \textcolor{required}{Required} & FEM solver for $\nabla \cdot (K\nabla V) = 0$ \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{K Tensor Computation (Paper Eqs. 20--21)}} \\
+\midrule
+\texttt{build\_K\_from\_voronoi()} & \textcolor{required}{Required} & Compute $k_{ij} = k^1_{ij} + k^2_{ij}$ \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{Figure Generators}} \\
+\midrule
+\texttt{case\_5c\_nba\_game()} & \textcolor{required}{Required} & NBA dispersal scenario \\
+\texttt{case\_5c\_nba\_arrival()} & \textcolor{required}{Required} & NBA arrival scenario \\
+\texttt{case\_5d\_gw\_commute()} & \textcolor{required}{Required} & GW Bridge commute \\
+\texttt{compute\_routes\_and\_plot()} & \textcolor{required}{Required} & Basic route comparison \\
+\texttt{solve\_continuum\_and\_plot()} & \textcolor{required}{Required} & Continuum heatmap \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{Data Preparation}} \\
+\midrule
+\texttt{align\_and\_clip()} & \textcolor{required}{Required} & Reproject \& clip roads \\
+\texttt{build\_graph\_from\_roads()} & \textcolor{required}{Required} & Build network graph \\
+\texttt{load\_graph()} & \textcolor{required}{Required} & Load graph from file \\
+\texttt{solve\_node\_potential()} & \textcolor{required}{Required} & Compute $\phi$ field \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{Core Algorithms}} \\
+\midrule
+\texttt{greedy\_path\_on\_nodes()} & \textcolor{required}{Required} & Singum routing (core) \\
+\texttt{dijkstra\_path()} & \textcolor{required}{Required} & Shortest path \\
+\texttt{compute\_shortest\_path\_potential()} & \textcolor{required}{Required} & Distance potential \\
+\texttt{path\_time()} & \textcolor{required}{Required} & Sum edge travel times \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{Coordinate Helpers}} \\
+\midrule
+\texttt{lonlat\_to\_2263()} & \textcolor{required}{Required} & Lon/lat to EPSG:2263 \\
+\texttt{nearest\_node()} & \textcolor{required}{Required} & Find closest node \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{Grid/Interpolation Helpers}} \\
+\midrule
+\texttt{\_manhattan\_mask\_and\_grid()} & \textcolor{required}{Required} & Create computation grid \\
+\texttt{\_interp\_K\_no\_nans()} & \textcolor{required}{Required} & Interpolate K \\
+\texttt{nan\_gaussian\_blur()} & \textcolor{required}{Required} & NaN-safe blur \\
+\texttt{apply\_dirichlet\_row\_replace()} & \textcolor{required}{Required} & Set Dirichlet BC \\
+\texttt{solve\_with\_component\_pinning()} & \textcolor{required}{Required} & Handle disconnected nodes \\
+\midrule
+
+\multicolumn{3}{l}{\textbf{Experimental (Can Remove)}} \\
+\midrule
+\texttt{reverse\_greedy\_path\_on\_nodes()} & \textcolor{unused}{Remove} & Reverse greedy experiment \\
+\texttt{reverse\_greedy\_from\_sink()} & \textcolor{unused}{Remove} & Another reverse variant \\
+\bottomrule
+\end{longtable}
+
+\textbf{Legend:}
+\begin{itemize}[noitemsep]
+    \item \textcolor{required}{Required}: Needed for figure generation
+    \item \textcolor{optional}{Optional}: Used but not critical
+    \item \textcolor{unused}{Remove}: Experimental, safe to delete
+\end{itemize}
+
+%==============================================================================
+\section{Dependency Graph}
+%==============================================================================
+
+\begin{verbatim}
+run_fig5c()
+  |-> case_5c_nba_game()
+        |-> load_graph()
+        |-> lonlat_to_2263()
+        |-> nearest_node()
+        |-> greedy_path_on_nodes()  <-- Core Singum algorithm
+        |-> path_time()
+
+run_fig5c_arrival()
+  |-> case_5c_nba_arrival()
+        |-> build_K_from_voronoi()  <-- Paper Eqs. 20-21
+        |     |-> load_graph()
+        |     |-> (computes k^1 + k^2 correction)
+        |-> _manhattan_mask_and_grid()
+        |-> _interp_K_no_nans()
+        |-> solve_fem_anisotropic()  <-- Paper Eq. 11 (FEM)
+        |     |-> _create_fem_mesh()  (Delaunay)
+        |     |-> _assemble_fem_system()
+        |     |-> spsolve()
+        |-> greedy_path_on_nodes()
+        |-> path_time()
+
+run_fig5d()
+  |-> case_5d_gw_commute()
+        |-> load_graph()
+        |-> dijkstra_path()
+        |-> compute_shortest_path_potential()
+        |-> greedy_path_on_nodes()
+        |-> path_time()
+
+solve_continuum_and_plot()
+  |-> build_K_from_voronoi()  <-- Paper Eqs. 20-21
+  |-> _manhattan_mask_and_grid()
+  |-> _interp_K_no_nans()
+  |-> solve_fem_anisotropic()  <-- Paper Eq. 11 (FEM)
+\end{verbatim}
+
+%==============================================================================
+\section{FEM Implementation Details}
+%==============================================================================
+
+The continuum PDE $\nabla \cdot (K \nabla V) = 0$ is solved using P1 (linear) finite elements:
+
+\subsection{Mesh Generation}
+\begin{itemize}[noitemsep]
+    \item Interior grid points extracted from Manhattan mask
+    \item Delaunay triangulation via \texttt{scipy.spatial.Delaunay}
+    \item Typical mesh: $\sim$163,000 nodes, $\sim$327,000 triangles
+\end{itemize}
+
+\subsection{Element Stiffness Matrix}
+For a triangle with vertices $(x_1, y_1), (x_2, y_2), (x_3, y_3)$:
+\begin{equation}
+    K^e_{ij} = |A| \cdot (\mathbf{K} \nabla N_j) \cdot \nabla N_i
+\end{equation}
+where $\nabla N_i$ is the gradient of the $i$-th basis function (constant on P1 elements).
+
+\subsection{Boundary Conditions}
+\begin{itemize}[noitemsep]
+    \item Dirichlet BCs applied via row replacement in stiffness matrix
+    \item Typical setup: $V=0$ at sink, $V=1$ at sources
+\end{itemize}
+
+\end{document}

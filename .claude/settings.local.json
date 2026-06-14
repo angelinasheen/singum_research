@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ide__getDiagnostics",
+      "Bash(python:*)",
+      "Bash(/opt/anaconda3/envs/spyder-5.4.3_10/bin/python:*)",
+      "Bash(ls:*)",
+      "Bash(pkill:*)",
+      "Bash(pdflatex:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
