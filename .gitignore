@@ -1,9 +1,11 @@
 # ===========================================================================
-# DATA FILES (too large for git)
+# DATA FILES
 # ===========================================================================
-data/
-*.geojson
-*.gdb
+# Keep data/ directory but ignore the large geodatabase
+data/lion/lion.gdb/
+
+# Ignore geojson files in output only (not in data/)
+output/*.geojson
 
 # ===========================================================================
 # GENERATED OUTPUT FILES
